@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Static website hosting with S3 and CloudFront
+Metadata:
+  'AWS::CloudFormation::Designer':
+    463b784d-2e55-46d5-9262-fe4e5098676f:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 270
+        'y': 210
+      z: 1
+      embeds: []
+    d827fdc5-ccea-43d0-b7bc-818de9f94720:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 450
+        'y': 180
+      z: 1
+      embeds: []
+    30d2830e-dc42-475f-a26a-a2f26c2d8976:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 150
+        'y': 120
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - 463b784d-2e55-46d5-9262-fe4e5098676f
+    526974d1-a4f5-4e2d-97cb-d6d22a1df103:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 240
+        'y': 330
+      z: 1
+      embeds: []
+Parameters:
+  WebsiteDomain:
+    Description: The domain for the newly hosted website
+    Type: String
+  DefaultRootObject:
+    Description: The default path for the index document.
+    Type: String
+    Default: /index.html
+  ErrorPagePath:
+    Description: The path of the error page for the website.
+    Type: String
+    Default: /index.html
+Resources:
+  CloudFrontOriginAccessIdentity:
+    Type: 'AWS::CloudFront::CloudFrontOriginAccessIdentity'
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub 'CloudFront Origin Access Identity for ${S3Bucket}'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: d827fdc5-ccea-43d0-b7bc-818de9f94720
+  ReadPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Statement:
+          - Action: 's3:GetObject'
+            Effect: Allow
+            Resource: !Sub 'arn:aws:s3:::${S3Bucket}/*'
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 30d2830e-dc42-475f-a26a-a2f26c2d8976
+  CloudFrontDistribution:
+    Type: 'AWS::CloudFront::Distribution'
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: !Ref ErrorPagePath
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: !Ref ErrorPagePath
+        DefaultRootObject: !Ref DefaultRootObject
+        Enabled: true
+        HttpVersion: http2
+        Origins:
+          - DomainName: !GetAtt S3Bucket.DomainName
+            Id: s3origin
+            S3OriginConfig:
+              OriginAccessIdentity: !Join 
+                - ''
+                - - origin-access-identity/cloudfront/
+                  - !Ref CloudFrontOriginAccessIdentity
+        PriceClass: PriceClass_All
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          Compress: true
+          DefaultTTL: 3600
+          ForwardedValues:
+            Cookies:
+              Forward: none
+            QueryString: false
+          MaxTTL: 86400
+          MinTTL: 60
+          TargetOriginId: s3origin
+          ViewerProtocolPolicy: allow-all
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 526974d1-a4f5-4e2d-97cb-d6d22a1df103
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Ref WebsiteDomain
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 463b784d-2e55-46d5-9262-fe4e5098676f
+Outputs:
+  BucketName:
+    Description: S3 Bucket Name
+    Value: !Ref S3Bucket
+  DistributionId:
+    Description: CloudFront Distribution ID
+    Value: !Ref CloudFrontDistribution
